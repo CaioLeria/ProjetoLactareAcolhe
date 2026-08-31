@@ -6,21 +6,6 @@
 
 ---
 
-## Alterações desta Revisão
-
-Esta versão incorpora as correções identificadas na revisão técnica da spec original. Resumo das mudanças:
-
-- Renomeado `BalcaoMensagemChat.kt` → `BalaoMensagemChat.kt` (era erro de digitação: balão de mensagem, não balcão).
-- `roteiroChat` alterado de `List<MensagemChat>` para `Map<String, MensagemChat>` (chave = texto da opção), alinhado à descrição de "dicionário de respostas" e simplificando `getRespostaBot`.
-- Padronizado o nome da tela de chat: `ChatFaqScreen`/`"chat_faq"` → `ChatScreen`/`"chat"`, para bater com "Chat Interativo" citado em Requisitos.
-- Definidos valores placeholder para as cores da marca (a confirmar com o manual oficial).
-- Adicionado `Constants.kt` para centralizar URL do site e número do WhatsApp usados nas Intents.
-- Explicitado o `startDestination = "apresentacao"` do NavHost.
-- Explicitado que, sem Hilt/Koin, cada ViewModel instancia o repository diretamente.
-- Explicitada a lógica do filtro "Todos" em `filtrarPorRegiao`.
-- Mantida `material-icons-extended`, com justificativa adicionada na tabela de dependências.
-
----
 
 ## Requisitos
 
@@ -32,7 +17,9 @@ Esta versão incorpora as correções identificadas na revisão técnica da spec
 - Código simples, explícito e sem frameworks de injeção de dependência (sem Hilt/Koin).
 - Toda tela e todo componente reutilizável deve ter função(ões) `@Preview` para visualização isolada no Android Studio, seguindo a divisão Stateful/Stateless.
 - Proibição estrita do uso de imagens ou ícones de chupetas/mamadeiras.
-
+- O código precisa ser claro quanto ao que faz, não adicionar comentários.
+- seguir exemplo de código:  https://github.com/carreiras/to-do-list
+- buscar dados para mock em: PontosColetaSP_MockData.kt
 ### Entity / Models
 
 ```kotlin
@@ -118,6 +105,7 @@ br.com.fiap.lactareacolhe/
 
 ## ViewModel
 
+lógicas sempre vivem na ViewModel, as Views são apenas camadas de apresentação
 Sem framework de injeção de dependência, cada ViewModel instancia o repository diretamente como propriedade privada: `private val repository = LactareRepository()`.
 
 ### ChatViewModel.kt
