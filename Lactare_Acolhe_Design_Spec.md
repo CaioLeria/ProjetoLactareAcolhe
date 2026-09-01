@@ -1,7 +1,7 @@
 # Lactare Acolhe — Design Spec
 
-**Data:** 2026-08-31
-**Versão:** 2 (revisada)
+**Data:** 2026-09-01
+**Versão:** 3 (revisada)
 **Contexto:** Projeto Challenge Sprint 3 — Android Kotlin Developer (FIAP)
 **Objetivo:** App Android do "Lactare Acolhe": MVP navegável e funcional, com dados mockados, que simula a conexão e o apoio à doação de leite humano. Demonstra arquitetura organizada, navegação com BottomBar e interface de chatbot sem depender de integrações com APIs reais nesta fase.
 
@@ -12,6 +12,7 @@
 - 4 telas principais: Onboarding de Apresentação, Home, Chat Interativo e Lista de Pontos de Coleta.
 - Navegação com `Navigation Compose` acoplado a um `Scaffold` com `BottomBar`.
 - Interface em **Português**, aderente ao tom de voz acolhedor e às cores do manual da marca Lactare — Azul Escuro `#0D3B66` e Azul Claro `#4FB0C6` (ver Pendências).
+- Toda a conversa do chat acontece por botões (`OpcaoChat`); não existe campo de texto livre em nenhuma tela do MVP.
 - Dados 100% mockados e realistas (sem *Lorem Ipsum*), centralizados em classes e listas estáticas.
 - Uso de `Intent` para redirecionamento externo (site e WhatsApp), sempre com tratamento de falha.
 - Código simples e explícito, sem frameworks de injeção de dependência (sem Hilt/Koin).
@@ -122,15 +123,68 @@ br.com.fiap.lactareacolhe/
 
 `object MockData`, singleton.
 
-**`val pontosDeColeta: List<PontoColeta>`** — lista pré-preenchida com hospitais e postos de coleta reais da cidade de São Paulo. Origem dos dados: ver Pendências.
+**`val pontosDeColeta: List<PontoColeta>`** — lista pré-preenchida com hospitais e postos de coleta reais da cidade de São Paulo. Origem dos dados: rBLH/Fiocruz (ver Pendências).
 
-**`val roteiroChat: Map<String, MensagemChat>`** — a chave é o identificador lógico do nó (`"inicio"`, `"amamentando"`, `"quero_doar"`, `"onde_doar"`, `"fallback"`), o valor é a `MensagemChat` do bot correspondente.
+**`val roteiroChat: Map<String, MensagemChat>`** — a chave é o identificador lógico do nó da conversa. O roteiro completo, com todas as chaves e transições, está detalhado na seção "Roteiro do Chat" logo abaixo.
 
 **`const val CHAVE_MENSAGEM_INICIAL = "inicio"`** — o nó `"inicio"` é a mensagem de boas-vindas do bot, carregada assim que a tela de chat abre. Sem ela, a usuária entra numa tela vazia e sem nada para clicar.
 
-**`const val CHAVE_FALLBACK = "fallback"`** — nó usado quando uma chave não existe no roteiro.
+**`const val CHAVE_FALLBACK = "fallback"`** — nó usado quando uma chave não existe no roteiro. Como toda entrada da usuária vem de um botão (nunca de texto livre), esse nó nunca deveria ser alcançado em uso normal — ele existe como rede de segurança para o caso de um `OpcaoChat.proximaMensagem` apontar, por erro no código, para uma chave que não existe no Map.
 
 **`val passosOnboarding: List<PassoOnboarding>`** — conteúdo das 3 páginas do onboarding (ver a seção ApresentacaoScreen).
+
+### Roteiro do Chat
+
+Adaptação do fluxo mostrado no PDF de referência para um formato 100% por botões. Os dois pontos que no PDF pediam texto livre foram resolvidos assim:
+
+- **Nome da usuária** → removido. A mensagem inicial já parte direto para as opções, sem perguntar ou usar o nome depois.
+- **CEP para localizar o ponto de coleta** → removido. A opção "Onde posso doar?" navega direto para `Rotas.PONTOS_COLETA`, onde a usuária vê a lista completa filtrável por zona — não precisa digitar nada.
+
+```mermaid
+flowchart TD
+    inicio -->|Estou amamentando| amamentando
+    inicio -->|Quero saber mais| quero_saber_mais
+    amamentando -->|Como doar| como_doar
+    amamentando -->|Onde posso doar? nav| onde_doar
+    amamentando -->|Tirar uma duvida| tirar_duvida
+    quero_saber_mais -->|Como doar| como_doar
+    quero_saber_mais -->|Onde posso doar? nav| onde_doar
+    quero_saber_mais -->|Tirar uma duvida| tirar_duvida
+    como_doar -->|Sim por favor nav| agendar_sim
+    como_doar -->|Agora nao| lembretes
+    como_doar -->|Tenho outra duvida| tirar_duvida
+    onde_doar -->|Voltar ao inicio| inicio
+    agendar_sim -->|Continuar| lembretes
+    tirar_duvida -->|Exames| duvida_exames
+    tirar_duvida -->|Medicamento| duvida_medicamento
+    tirar_duvida -->|Voltar ao inicio| inicio
+    duvida_exames -->|Outra duvida| tirar_duvida
+    duvida_exames -->|Voltar ao inicio| inicio
+    duvida_medicamento -->|Onde posso doar? nav| onde_doar
+    duvida_medicamento -->|Voltar ao inicio| inicio
+    lembretes -->|Sim| despedida
+    lembretes -->|Agora nao| despedida
+    despedida -->|Recomecar| inicio
+```
+
+`nav` marca as opções com `rota = Rotas.PONTOS_COLETA` preenchido — além de continuar o roteiro, elas navegam a usuária para a tela de Pontos de Coleta.
+
+| Chave | Opções (rótulo → próxima chave) |
+| --- | --- |
+| `inicio` | Estou amamentando → `amamentando` · Quero saber mais → `quero_saber_mais` |
+| `amamentando` | Como doar → `como_doar` · Onde posso doar? (nav) → `onde_doar` · Tirar uma dúvida → `tirar_duvida` |
+| `quero_saber_mais` | mesmas três opções de `amamentando` |
+| `como_doar` | Sim, por favor! (nav) → `agendar_sim` · Agora não → `lembretes` · Tenho outra dúvida → `tirar_duvida` |
+| `onde_doar` | Voltar ao início → `inicio` |
+| `agendar_sim` | Continuar → `lembretes` |
+| `tirar_duvida` | Exames → `duvida_exames` · Medicamento → `duvida_medicamento` · Voltar ao início → `inicio` |
+| `duvida_exames` | Tenho outra dúvida → `tirar_duvida` · Voltar ao início → `inicio` |
+| `duvida_medicamento` | Onde posso doar? (nav) → `onde_doar` · Voltar ao início → `inicio` |
+| `lembretes` | Sim, com certeza! → `despedida` · Agora não, obrigada → `despedida` |
+| `despedida` | Recomeçar → `inicio` |
+| `fallback` | Recomeçar → `inicio` |
+
+Conteúdo completo, com os textos reais e os objetos `MensagemChat`/`OpcaoChat` prontos para colar em `MockData.kt`, está no arquivo `RoteiroChat_MockData.kt`.
 
 ### Constants.kt
 
@@ -283,7 +337,7 @@ data class PassoOnboarding(val titulo: String, val texto: String)
 ### ChatScreen
 
 - `ChatScreen` (stateful): coleta `historico` e `isDigitando` do `ChatViewModel` via `collectAsStateWithLifecycle()`. Ao receber uma `OpcaoChat` com `rota != null`, chama `viewModel.selecionarOpcao(opcao)` **e** `navController.navigate(rota)`.
-- `ChatContent` (previewável): recebe `historico: List<MensagemChat>`, `isDigitando: Boolean` e callback `onOpcaoSelecionada: (OpcaoChat) -> Unit`.
+- `ChatContent` (previewável): recebe `historico: List<MensagemChat>`, `isDigitando: Boolean` e callback `onOpcaoSelecionada: (OpcaoChat) -> Unit`. Não existe nenhum `TextField` ou campo de entrada de texto nesta tela — a única forma de interação da usuária é tocar num dos botões de opção.
 - `LazyColumn` com `key = { it.id }`, rolando automaticamente para a última mensagem a cada item novo.
 - Mensagens alinhadas à direita (usuária) ou à esquerda (bot).
 - As opções são renderizadas como botões abaixo da bolha **apenas na última mensagem do bot**. Mensagens anteriores exibem só o texto, evitando que a usuária reabra um ramo já respondido no meio da conversa.
@@ -337,7 +391,8 @@ Itens bloqueantes ou com valor provisório, a resolver antes da entrega:
 | `Constants.WHATSAPP_NUMERO` | Placeholder | Número oficial do projeto, só dígitos. |
 | Cores `#0D3B66` / `#4FB0C6` | Provisórias | Confirmação no manual oficial da marca Lactare. |
 | Tipografia | Indefinida | Fonte do manual da marca, ou decisão explícita de usar a tipografia padrão do Material 3. |
-| Dados de `pontosDeColeta` | Origem incerta | O arquivo `PontosColetaSP_MockData.kt` foi citado como fonte, mas não está no repositório nem tem caminho conhecido. Localizar o arquivo ou levantar os dados a partir da lista de bancos de leite da rede pública de São Paulo. |
+| Dados de `pontosDeColeta` | Resolvido, com ressalva | O arquivo `PontosColetaSP_MockData.kt` foi gerado a partir da rBLH/Fiocruz, mas usa o contrato antigo de `PontoColeta` (campo único `regiao`). Precisa ser reexportado para o contrato atual, com `bairro` e `zona` como campos separados. |
+| Lembretes semanais | Só roteiro | A opção "Sim, com certeza!" apenas avança a conversa no `roteiroChat`; não há agendamento nem notificação real implementados nesta sprint. |
 
 ---
 
